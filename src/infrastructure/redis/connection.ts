@@ -1,18 +1,18 @@
-import IORedis, { type Redis } from 'ioredis';
+import type { ConnectionOptions } from 'bullmq';
 import { config } from '../../shared/config/index.js';
 
 /**
- * Crea una conexión Redis para BullMQ.
+ * Opciones de conexión Redis para BullMQ.
  *
- * `maxRetriesPerRequest: null` es REQUISITO de BullMQ para los comandos
- * bloqueantes de los Workers. Se crea una conexión nueva por llamada porque
- * BullMQ recomienda no compartir la misma conexión entre Queue y Worker.
+ * Se pasan como OPCIONES (no como instancia compartida): BullMQ crea internamente
+ * las conexiones que necesita por cola/worker, evitando el conflicto de tipos por
+ * la copia anidada de ioredis que trae BullMQ.
+ *
+ * `maxRetriesPerRequest: null` es requisito de BullMQ para comandos bloqueantes.
  */
-export function createRedisConnection(): Redis {
-  return new IORedis({
-    host: config.redis.host,
-    port: config.redis.port,
-    password: config.redis.password,
-    maxRetriesPerRequest: null,
-  });
-}
+export const redisConnectionOptions: ConnectionOptions = {
+  host: config.redis.host,
+  port: config.redis.port,
+  password: config.redis.password,
+  maxRetriesPerRequest: null,
+};

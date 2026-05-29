@@ -1,8 +1,7 @@
 import type { preHandlerHookHandler } from 'fastify';
 import type { Queue } from 'bullmq';
-import type { Redis } from 'ioredis';
 import { prisma } from './infrastructure/database/prisma.js';
-import { createRedisConnection } from './infrastructure/redis/connection.js';
+import { redisConnectionOptions } from './infrastructure/redis/connection.js';
 import { config } from './shared/config/index.js';
 import { SystemClock } from './shared/clock/clock.js';
 import { InProcessEventBus } from './shared/events/event-bus.js';
@@ -59,17 +58,14 @@ export interface AppContainer {
   ticketRepo: TicketRepository;
   reassignmentQueue: Queue;
   notificationsQueue: Queue;
-  // Recursos a cerrar
-  redis: Redis;
 }
 
 export function buildContainer(): AppContainer {
   const clock = new SystemClock();
 
   // ── Infraestructura compartida ──
-  const redis = createRedisConnection();
-  const reassignmentQueue = createReassignmentQueue(redis);
-  const notificationsQueue = createNotificationsQueue(redis);
+  const reassignmentQueue = createReassignmentQueue(redisConnectionOptions);
+  const notificationsQueue = createNotificationsQueue(redisConnectionOptions);
   const scheduler = new BullReassignmentScheduler(reassignmentQueue);
   const notifications = new BullNotificationQueue(notificationsQueue);
   const bus = new InProcessEventBus();
@@ -150,6 +146,5 @@ export function buildContainer(): AppContainer {
     ticketRepo,
     reassignmentQueue,
     notificationsQueue,
-    redis,
   };
 }

@@ -1,5 +1,4 @@
-import { Queue } from 'bullmq';
-import type { Redis } from 'ioredis';
+import { Queue, type ConnectionOptions } from 'bullmq';
 import type {
   NotificationJob,
   NotificationQueue,
@@ -22,14 +21,14 @@ export const JOB_NAMES = {
   notify: 'notify',
 } as const;
 
-export function createReassignmentQueue(connection: Redis): Queue {
+export function createReassignmentQueue(connection: ConnectionOptions): Queue {
   return new Queue(QUEUE_NAMES.reassignment, {
     connection,
     defaultJobOptions: { removeOnComplete: true, removeOnFail: 200 },
   });
 }
 
-export function createNotificationsQueue(connection: Redis): Queue {
+export function createNotificationsQueue(connection: ConnectionOptions): Queue {
   return new Queue(QUEUE_NAMES.notifications, {
     connection,
     defaultJobOptions: {

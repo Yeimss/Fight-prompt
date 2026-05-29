@@ -2,7 +2,7 @@ import { Worker } from 'bullmq';
 import { buildContainer } from '../app.js';
 import { config } from '../shared/config/index.js';
 import { logger } from '../shared/logger/logger.js';
-import { createRedisConnection } from '../infrastructure/redis/connection.js';
+import { redisConnectionOptions } from '../infrastructure/redis/connection.js';
 import { JOB_NAMES, QUEUE_NAMES } from './queue.js';
 import { createReassignmentProcessor } from './reassignment.job.js';
 import { createNotificationProcessor } from './notification.worker.js';
@@ -22,11 +22,11 @@ async function bootstrapWorker(): Promise<void> {
       sweepLimit: 200,
       now: () => new Date(),
     }),
-    { connection: createRedisConnection(), concurrency: 5 },
+    { connection: redisConnectionOptions, concurrency: 5 },
   );
 
   const notificationsWorker = new Worker(QUEUE_NAMES.notifications, createNotificationProcessor(), {
-    connection: createRedisConnection(),
+    connection: redisConnectionOptions,
     concurrency: 10,
   });
 
@@ -51,8 +51,12 @@ async function bootstrapWorker(): Promise<void> {
 
   const shutdown = async (): Promise<void> => {
     logger.info('Cerrando worker…');
-    await Promise.allSettled([reassignmentWorker.close(), notificationsWorker.close()]);
-    await container.redis.quit();
+    await Promise.allSettled([
+      reassignmentWorker.close(),
+      notificationsWorker.close(),
+      container.reassignmentQueue.close(),
+      container.notificationsQueue.close(),
+    ]);
     process.exit(0);
   };
   process.on('SIGINT', shutdown);
