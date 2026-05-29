@@ -29,22 +29,18 @@ export function computeSlaDueAt(from: Date, slaMinutes: number): Date {
   return new Date(from.getTime() + slaMinutes * 60_000);
 }
 
-function isActive(status: TicketStatus): boolean {
+/** ¿El ticket sigue "vivo" (OPEN/IN_PROGRESS)? */
+export function isTicketActive(status: TicketStatus): boolean {
   return (ACTIVE_STATUSES as readonly string[]).includes(status);
 }
 
 /** ¿El ticket venció el SLA sin actividad y sigue activo? */
 export function isOverdue(ticket: TicketProps, now: Date): boolean {
   return (
-    isActive(ticket.status) &&
+    isTicketActive(ticket.status) &&
     ticket.slaDueAt !== null &&
     ticket.slaDueAt.getTime() <= now.getTime()
   );
-}
-
-/** ¿Es candidato a reasignación automática? (activo y con un asignado actual). */
-export function canAutoReassign(ticket: TicketProps): boolean {
-  return isActive(ticket.status) && ticket.assigneeId !== null;
 }
 
 /** Transiciones de estado permitidas (un CLOSED es terminal). */
