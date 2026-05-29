@@ -1,0 +1,2 @@
+# Tests e2e (Supertest): flujo HTTP completo
+# login -> crear ticket -> simular vencimiento de SLA -> verificar reasignación.

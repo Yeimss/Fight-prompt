@@ -1,0 +1,112 @@
+// ──────────────────────────────────────────────
+//  Esquema de datos — SQL Server (provider: sqlserver)
+//
+//  Nota: el conector de SQL Server NO soporta `enum` nativo. Los campos de
+//  estado/rol se modelan como String y sus valores válidos se validan en la
+//  capa de aplicación (Zod) y en el dominio (union types en *.entity.ts).
+//
+//  Tampoco admite múltiples rutas de CASCADE hacia una misma tabla, por eso las
+//  relaciones usan onDelete/onUpdate: NoAction. La integridad de borrados se
+//  gestiona a nivel de aplicación (soft delete con deletedAt).
+// ──────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+// Valores válidos (validados con Zod en la capa de aplicación):
+//   role             : ADMIN | AGENT | USER
+//   ticket.status    : OPEN | IN_PROGRESS | RESOLVED | CLOSED
+//   ticket.priority  : LOW | MEDIUM | HIGH | URGENT
+//   assignment.reason: MANUAL | AUTO_REASSIGN | ESCALATION
+
+model User {
+  id           String   @id @default(uuid()) @db.UniqueIdentifier
+  email        String   @unique @db.NVarChar(255)
+  passwordHash String   @db.NVarChar(255)
+  name         String   @db.NVarChar(150)
+  role         String   @default("USER") @db.NVarChar(20)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  assignedTickets Ticket[]           @relation("AssignedTickets")
+  createdTickets  Ticket[]           @relation("CreatedTickets")
+  assignmentsFrom TicketAssignment[] @relation("AssignmentFrom")
+  assignmentsTo   TicketAssignment[] @relation("AssignmentTo")
+  refreshTokens   RefreshToken[]
+
+  @@index([role])
+}
+
+// Refresh tokens persistidos: rotativos (cada refresh emite uno nuevo y revoca
+// el anterior) y revocables (logout). Se guarda solo el hash SHA-256 del token,
+// nunca el valor en claro. La detección de reutilización (un token ya revocado
+// que se vuelve a presentar) permite revocar toda la familia ante un robo.
+model RefreshToken {
+  id           String    @id @default(uuid()) @db.UniqueIdentifier
+  userId       String    @db.UniqueIdentifier
+  user         User      @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  tokenHash    String    @unique @db.NVarChar(64) // SHA-256 en hex (64 chars)
+  expiresAt    DateTime
+  revokedAt    DateTime?
+  replacedById String?   @db.UniqueIdentifier // rotación: token que lo sustituyó
+  createdByIp  String?   @db.NVarChar(45)
+  userAgent    String?   @db.NVarChar(255)
+  createdAt    DateTime  @default(now())
+
+  @@index([userId])
+}
+
+model Ticket {
+  id          String @id @default(uuid()) @db.UniqueIdentifier
+  title       String @db.NVarChar(255)
+  description String @db.NVarChar(Max)
+  status      String @default("OPEN") @db.NVarChar(20)
+  priority    String @default("MEDIUM") @db.NVarChar(20)
+
+  // Asignación actual
+  assigneeId String? @db.UniqueIdentifier
+  assignee   User?   @relation("AssignedTickets", fields: [assigneeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  createdById String @db.UniqueIdentifier
+  createdBy   User   @relation("CreatedTickets", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  // Campos clave para detección de inactividad / SLA
+  lastActivityAt    DateTime @default(now())
+  slaDueAt          DateTime?
+  autoReassignCount Int      @default(0)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime? // soft delete
+
+  assignments TicketAssignment[]
+
+  // Índice central para el job de reasignación
+  @@index([status, slaDueAt])
+  @@index([assigneeId])
+}
+
+// Histórico/auditoría de asignaciones
+model TicketAssignment {
+  id       String @id @default(uuid()) @db.UniqueIdentifier
+  ticketId String @db.UniqueIdentifier
+  ticket   Ticket @relation(fields: [ticketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  fromUserId String? @db.UniqueIdentifier
+  fromUser   User?   @relation("AssignmentFrom", fields: [fromUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  toUserId String @db.UniqueIdentifier
+  toUser   User   @relation("AssignmentTo", fields: [toUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  reason    String   @db.NVarChar(20)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId])
+}

@@ -1,0 +1,2 @@
+# Tests de integración: casos de uso contra SQL Server real efímero
+# (Testcontainers). Verifican queries, transacciones y locking de reasignación.

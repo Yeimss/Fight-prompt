@@ -1,0 +1,2 @@
+# Tests unitarios: reglas de dominio (transiciones de estado, cálculo de SLA,
+# estrategias de reasignación) con repositorios en memoria y FakeClock.
