@@ -1,17 +1,62 @@
+import { Worker } from 'bullmq';
+import { buildContainer } from '../app.js';
+import { config } from '../shared/config/index.js';
 import { logger } from '../shared/logger/logger.js';
+import { createRedisConnection } from '../infrastructure/redis/connection.js';
+import { JOB_NAMES, QUEUE_NAMES } from './queue.js';
+import { createReassignmentProcessor } from './reassignment.job.js';
+import { createNotificationProcessor } from './notification.worker.js';
 
 /**
- * Punto de entrada del PROCESO WORKER (separado del API).
- *
- * Levanta los Workers BullMQ (reassignment, notifications) y programa el job
- * repetible de barrido. Se despliega y escala de forma independiente del API:
- * más carga de reasignación -> más réplicas de este proceso.
- *
- * Pendiente de implementación.
+ * Proceso WORKER (separado del API): consume las colas BullMQ y ejecuta el
+ * barrido periódico. Se despliega y escala de forma independiente del API.
  */
 async function bootstrapWorker(): Promise<void> {
-  logger.info('Worker de jobs iniciado (pendiente de implementación)');
-  // TODO: instanciar Workers de BullMQ y el scheduler de barrido.
+  const container = buildContainer();
+
+  const reassignmentWorker = new Worker(
+    QUEUE_NAMES.reassignment,
+    createReassignmentProcessor({
+      reassign: container.reassignUseCase,
+      tickets: container.ticketRepo,
+      sweepLimit: 200,
+      now: () => new Date(),
+    }),
+    { connection: createRedisConnection(), concurrency: 5 },
+  );
+
+  const notificationsWorker = new Worker(QUEUE_NAMES.notifications, createNotificationProcessor(), {
+    connection: createRedisConnection(),
+    concurrency: 10,
+  });
+
+  reassignmentWorker.on('failed', (job, err) =>
+    logger.error({ jobId: job?.id, err }, 'Job de reasignación falló'),
+  );
+  notificationsWorker.on('failed', (job, err) =>
+    logger.error({ jobId: job?.id, err }, 'Job de notificación falló'),
+  );
+
+  // Barrido repetible (red de seguridad): cada N minutos revisa tickets vencidos.
+  await container.reassignmentQueue.add(
+    JOB_NAMES.sweep,
+    {},
+    { repeat: { every: config.tickets.sweepIntervalMinutes * 60_000 }, removeOnComplete: true },
+  );
+
+  logger.info(
+    { sweepEveryMin: config.tickets.sweepIntervalMinutes },
+    'Worker iniciado: reassignment + notifications + barrido',
+  );
+
+  const shutdown = async (): Promise<void> => {
+    logger.info('Cerrando worker…');
+    await Promise.allSettled([reassignmentWorker.close(), notificationsWorker.close()]);
+    await container.redis.quit();
+    process.exit(0);
+  };
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
 }
 
 bootstrapWorker().catch((err) => {

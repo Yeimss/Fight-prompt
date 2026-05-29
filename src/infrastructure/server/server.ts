@@ -9,6 +9,7 @@ import { errorHandler } from '../../shared/middlewares/error-handler.js';
 import { globalRateLimit } from '../../shared/middlewares/rate-limit.js';
 import { buildAuthRoutes } from '../../modules/auth/auth.routes.js';
 import { buildUserRoutes } from '../../modules/users/users.routes.js';
+import { buildTicketRoutes } from '../../modules/tickets/tickets.routes.js';
 
 /**
  * Construye y configura la instancia de Fastify con la pila de seguridad y las
@@ -35,6 +36,9 @@ export async function buildServer(): Promise<FastifyInstance> {
   await app.register(buildAuthRoutes(container.authController), { prefix: '/api/v1/auth' });
   await app.register(buildUserRoutes(container.userController, container.authenticate), {
     prefix: '/api/v1/users',
+  });
+  await app.register(buildTicketRoutes(container.ticketController, container.authenticate), {
+    prefix: '/api/v1/tickets',
   });
 
   return app;
