@@ -1,12 +1,18 @@
 import type { UserProps, Role } from './user.entity.js';
 
+export interface CreateUserInput {
+  email: string;
+  passwordHash: string;
+  name: string;
+  role: Role;
+}
+
 /**
  * Puerto del repositorio de usuarios.
- * findAvailableAgents() apoya a las estrategias de reasignación.
- * Pendiente de implementación.
+ * findByRole apoya a las estrategias de reasignación (p. ej. listar AGENTs).
  */
 export interface UserRepository {
-  create(data: Partial<UserProps>): Promise<UserProps>;
+  create(input: CreateUserInput): Promise<UserProps>;
   findById(id: string): Promise<UserProps | null>;
   findByEmail(email: string): Promise<UserProps | null>;
   findByRole(role: Role): Promise<UserProps[]>;
