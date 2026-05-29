@@ -16,7 +16,7 @@ export interface DomainEvent {
 export type EventHandler<E extends DomainEvent = DomainEvent> = (event: E) => Promise<void>;
 
 export interface EventBus {
-  publish(event: DomainEvent): Promise<void>;
+  publish<E extends DomainEvent>(event: E): Promise<void>;
   subscribe(eventName: string, handler: EventHandler): void;
 }
 

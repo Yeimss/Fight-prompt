@@ -49,6 +49,7 @@ export interface TicketStatusChangedEvent extends BaseTicketEvent {
 
 export interface TicketCommentedEvent extends BaseTicketEvent {
   name: typeof TICKET_EVENTS.Commented;
+  body: string;
 }
 
 export interface SLABreachedEvent extends BaseTicketEvent {
