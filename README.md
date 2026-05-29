@@ -73,6 +73,49 @@ npm run worker    # Worker de jobs
 npm test
 ```
 
+## Autenticación (implementada)
+
+JWT con **access token (~30 min)** + **refresh token rotativo persistido** (revocable
+en logout, con detección de reúso). Contraseñas con **argon2id**. Entrada validada
+con **Zod**, seguridad con **helmet**, **CORS** restringido y **rate limit** (estricto
+en login). Secretos validados al arranque (fail-fast).
+
+### Matriz de permisos (RBAC)
+
+| Acción                 | ADMIN | AGENT | USER |
+|------------------------|:-----:|:-----:|:----:|
+| Gestionar usuarios     |   ✓   |       |      |
+| Crear ticket           |   ✓   |   ✓   |  ✓   |
+| Ver todos los tickets  |   ✓   |   ✓   |      |
+| Ver tickets propios    |   ✓   |   ✓   |  ✓   |
+| Asignar ticket         |   ✓   |   ✓   |      |
+| Reasignar (manual)     |   ✓   |   ✓   |      |
+| Cerrar ticket          |   ✓   |   ✓   |      |
+| Comentar / actualizar  |   ✓   |   ✓   |  ✓   |
+
+> La reasignación **automática** por SLA la ejecuta el worker, no un usuario.
+
+### Endpoints
+
+| Método | Ruta                    | Auth        | Descripción                         |
+|--------|-------------------------|-------------|-------------------------------------|
+| POST   | `/api/v1/auth/login`    | público     | Login → access + refresh (5 req/min)|
+| POST   | `/api/v1/auth/refresh`  | público     | Rota el refresh y emite nuevo par   |
+| POST   | `/api/v1/auth/logout`   | público     | Revoca el refresh token             |
+| POST   | `/api/v1/users`         | ADMIN       | Crear usuario                       |
+| GET    | `/api/v1/users/me`      | autenticado | Datos del usuario actual            |
+
+### Admin inicial (seed)
+
+```bash
+npm run seed   # crea admin@tickets.local / ChangeMe_123! (cámbialo)
+```
+
+> Producción: usar un secrets manager para los `JWT_*`, terminar **HTTPS** en el
+> reverse proxy/load balancer (la app confía en `X-Forwarded-*` vía `trustProxy`),
+> servir el refresh token en cookie `httpOnly` y usar un usuario de BD de
+> **mínimo privilegio** (no `sa`).
+
 ## Scripts útiles
 
 | Script | Descripción |

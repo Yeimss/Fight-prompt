@@ -92,7 +92,7 @@ Algunas de las entidades ya fueron implementadas porque inicialmente se crearon 
 ## Contexto
 Se requiere crear un siste de tareas automáticas que se encargue de actualizar los tickets que llegaron a su límite de espera
 
-# Definición del requerimiento
+## Definición del requerimiento
 Jobs diferidos por ticket (BullMQ delayed jobs)
 Cuando se crea o actualiza un ticket, se programa un job diferido en BullMQ con delay = tiempo_límite:
 
@@ -126,15 +126,3 @@ Colas (BullMQ):
 Cola reassignment — jobs diferidos.
 Cola notifications — envío de correos con reintentos y backoff exponencial.
 Empezar con event bus en proceso (EventEmitter/mediator). Si se requiere comunicación entre servicios futuros, migrar a un broker externo (RabbitMQ / Kafka) reemplazando solo la implementación del bus.
-
-# Estrategia de testing
-Pirámide de tests:
-
-Nivel	Qué prueba	Herramienta
-Unit	Reglas de dominio (transiciones de estado, cálculo SLA, estrategia de reasignación). Repos en memoria. Rápidos, sin I/O.	Vitest/Jest
-Integration	UseCases contra DB real efímera + repos Prisma. Verifica queries, transacciones y locking.	Testcontainers (Postgres/Redis)
-E2E	Flujo HTTP completo: login → crear ticket → asignar → simular vencimiento → verificar reasignación.	Supertest
-Énfasis especial: la lógica de reasignación debe tener tests deterministas. Clave: inyectar el reloj (Clock abstraído) en lugar de usar Date.now() directo, para simular el paso del tiempo sin esperas reales. Probar concurrencia (dos workers, un ticket) y idempotencia.
-
-Cobertura mínima en la capa de dominio (lo crítico), no perseguir 100% global.
-Tests en CI obligatorios antes de merge.

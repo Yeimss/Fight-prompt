@@ -87,6 +87,7 @@ model Ticket {
   deletedAt DateTime? // soft delete
 
   assignments TicketAssignment[]
+  events      TicketEvent[]
 
   // Índice central para el job de reasignación
   @@index([status, slaDueAt])
@@ -109,4 +110,20 @@ model TicketAssignment {
   createdAt DateTime @default(now())
 
   @@index([ticketId])
+}
+
+// Event sourcing ligero: registro inmutable de cambios del ticket
+// (TicketCreated, TicketAssigned, TicketReassigned, StatusChanged, SLABreached…).
+// payload guarda el detalle del evento como JSON (NVARCHAR(MAX) en SQL Server).
+// Solo se inserta, nunca se actualiza ni borra: es la fuente de auditoría.
+model TicketEvent {
+  id        String   @id @default(uuid()) @db.UniqueIdentifier
+  ticketId  String   @db.UniqueIdentifier
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  type      String   @db.NVarChar(50)
+  payload   String   @db.NVarChar(Max) // JSON serializado
+  actorId   String?  @db.UniqueIdentifier // usuario que originó el evento (null = sistema)
+  createdAt DateTime @default(now())
+
+  @@index([ticketId, createdAt])
 }
